@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import itertools
+import os
+import signal
 import sys
 import threading
+from pathlib import Path
 from typing import Callable
 
 from tecjustica_transcribe import __version__
@@ -436,6 +439,9 @@ def _layout(pagina_ativa: str, conteudo_fn: Callable[[], None]) -> None:
 
 def main() -> None:
     """Inicia a GUI desktop."""
+    if hasattr(signal, "SIGHUP"):
+        signal.signal(signal.SIGHUP, signal.SIG_IGN)
+
     stop_spinner = threading.Event()
     threading.Thread(
         target=_spinner,
@@ -485,6 +491,13 @@ def main() -> None:
             pass
 
     stop_spinner.set()
+
+    # Redirecionar saída para log (sobrevive ao terminal fechar)
+    _log_dir = Path.home() / ".local/share/tecjustica"
+    _log_dir.mkdir(parents=True, exist_ok=True)
+    _log_file = open(_log_dir / "gui.log", "a")  # noqa: SIM115
+    os.dup2(_log_file.fileno(), 1)
+    os.dup2(_log_file.fileno(), 2)
 
     run_kwargs = dict(
         title="TecJustiça Transcribe",
