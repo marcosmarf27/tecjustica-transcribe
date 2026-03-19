@@ -8,7 +8,7 @@ import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from nicegui import app, events, ui
+from nicegui import events, ui
 
 from tecjustica_transcribe.core.config import obter_token_hf
 from tecjustica_transcribe.core.transcription import (
@@ -47,7 +47,6 @@ class _EstadoTranscricao:
     resultado: TranscriptionResult | None = None
     erro: str | None = None
     arquivo: str = ""
-    media_url: str = ""
     fila: queue.Queue = field(default_factory=queue.Queue)
 
     def resetar(self) -> None:
@@ -66,9 +65,6 @@ class _EstadoTranscricao:
 
 _estado = _EstadoTranscricao()
 
-_VIDEO_EXTS = {".mp4", ".mkv", ".avi", ".mov", ".webm"}
-
-
 def _formatar_timestamp(segundos: float) -> str:
     """Formata segundos como MM:SS ou H:MM:SS."""
     s = int(segundos)
@@ -77,11 +73,6 @@ def _formatar_timestamp(segundos: float) -> str:
     if h:
         return f"{h}:{m:02d}:{s:02d}"
     return f"{m:02d}:{s:02d}"
-
-
-def _is_video(path: str) -> bool:
-    """Retorna True se a extensão indica vídeo."""
-    return Path(path).suffix.lower() in _VIDEO_EXTS
 
 
 def conteudo() -> None:
@@ -174,7 +165,7 @@ def conteudo() -> None:
         btn_transcrever.disable()
         progresso_panel.visible = True
         resultado_panel.visible = False
-        player_panel.visible = False
+        download_panel.visible = False
         transcricao_panel.visible = False
         erro_label.visible = False
         progresso_bar.value = 0
@@ -282,48 +273,44 @@ def conteudo() -> None:
             "color: var(--text); line-height: 1.6"
         )
 
-    # ---- Player ----
-    player_panel = ui.card().classes("vsc-panel w-full q-mt-sm")
-    player_panel.visible = False
+    # ---- Downloads ----
+    download_panel = ui.card().classes("vsc-panel w-full q-mt-sm")
+    download_panel.visible = False
 
-    # ---- Transcrição interativa ----
+    # ---- Transcrição (somente leitura) ----
     transcricao_panel = ui.card().classes("vsc-panel w-full q-mt-sm")
     transcricao_panel.visible = False
 
-    player_ref: list = [None]
-    segment_rows: list[tuple] = []
-
-    def _popular_midia(result: TranscriptionResult) -> None:
-        """Popula player e transcrição clicável."""
-        arquivo_path = Path(_estado.arquivo)
-        _estado.media_url = app.add_media_file(local_file=arquivo_path)
-
-        # Player
-        player_panel.visible = True
-        player_panel.clear()
-        with player_panel:
+    def _popular_resultado(result: TranscriptionResult) -> None:
+        """Popula downloads e transcrição somente-leitura."""
+        # Downloads
+        download_panel.visible = True
+        download_panel.clear()
+        with download_panel:
             with ui.row().classes("items-center gap-2"):
-                ui.icon("play_circle", size="20px").style(
+                ui.icon("download", size="20px").style(
                     "color: var(--accent)"
                 )
-                ui.label("REPRODUÇÃO").classes("vsc-section").style(
+                ui.label("ARQUIVOS").classes("vsc-section").style(
                     "margin-bottom: 0 !important"
                 )
-            if _is_video(_estado.arquivo):
-                player = ui.video(_estado.media_url).props(
-                    "controls"
-                ).classes("w-full")
-            else:
-                player = ui.audio(_estado.media_url).props(
-                    "controls"
-                ).classes("w-full")
-        player_ref[0] = player
+            with ui.row().classes("gap-2 q-mt-sm"):
+                for caminho, label, icone in [
+                    (result.caminho_txt, "TXT", "description"),
+                    (result.caminho_srt, "SRT", "subtitles"),
+                    (result.caminho_json, "JSON", "code"),
+                ]:
+                    ui.button(
+                        label,
+                        icon=icone,
+                        on_click=lambda p=caminho: ui.download(
+                            p.read_bytes(), p.name
+                        ),
+                    ).classes("vsc-btn")
 
-        # Transcrição
+        # Transcrição (somente leitura)
         transcricao_panel.visible = True
         transcricao_panel.clear()
-        segment_rows.clear()
-
         with transcricao_panel:
             with ui.row().classes("items-center gap-2"):
                 ui.icon("subject", size="20px").style(
@@ -336,13 +323,12 @@ def conteudo() -> None:
             with ui.scroll_area().style("max-height: 400px"):
                 for seg in result.segments:
                     start = seg.get("start", 0)
-                    end = seg.get("end", 0)
                     speaker = seg.get("speaker", "")
                     text = seg.get("text", "").strip()
 
                     with ui.row().classes(
                         "segment-row items-center w-full gap-2"
-                    ).style("padding: 6px 8px") as row:
+                    ).style("padding: 6px 8px"):
                         ui.label(
                             _formatar_timestamp(start)
                         ).classes("mono").style(
@@ -359,46 +345,9 @@ def conteudo() -> None:
                             )
                         ui.label(text).style("font-size: 13px")
 
-                        row.on(
-                            "click",
-                            lambda s=start: (
-                                player_ref[0].seek(s),
-                                player_ref[0].play(),
-                            ),
-                        )
-
-                    segment_rows.append((row, start, end))
-
-        # Highlight do segmento ativo (só atualiza quando muda)
-        active_idx: list[int] = [-1]
-
-        def _on_timeupdate(e) -> None:
-            t = e.args[0] if isinstance(e.args, (list, tuple)) else e.args
-            if not isinstance(t, (int, float)):
-                return
-            new_idx = -1
-            for i, (_r, s, se) in enumerate(segment_rows):
-                if s <= t < se:
-                    new_idx = i
-                    break
-            if new_idx == active_idx[0]:
-                return
-            if 0 <= active_idx[0] < len(segment_rows):
-                segment_rows[active_idx[0]][0].classes(remove="active")
-            if 0 <= new_idx < len(segment_rows):
-                segment_rows[new_idx][0].classes(add="active")
-            active_idx[0] = new_idx
-
-        player.on(
-            "timeupdate",
-            _on_timeupdate,
-            ["event.target.currentTime"],
-            throttle=1.0,
-        )
-
     # Restaurar se já houver resultado (navegação entre páginas)
-    if _estado.resultado is not None and _estado.arquivo:
-        _popular_midia(_estado.resultado)
+    if _estado.resultado is not None:
+        _popular_resultado(_estado.resultado)
 
     # ---- Erro ----
     erro_label = ui.label(
@@ -448,7 +397,7 @@ def conteudo() -> None:
                     f"  {result.caminho_json.name}  (dados completos)"
                 )
                 ui.notify("Transcrição concluída!", type="positive")
-                _popular_midia(result)
+                _popular_resultado(result)
 
             elif item[0] == "error":
                 error_msg = item[1]
