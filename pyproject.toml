@@ -1,0 +1,42 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "tecjustica-transcribe"
+version = "0.1.5"
+description = "CLI para transcrição de audiências judiciais com WhisperX e diarização"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10,<3.14"
+authors = [
+    { name = "TecJustiça" },
+]
+keywords = ["transcrição", "whisperx", "audiência", "diarização", "justiça"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Legal Industry",
+    "Programming Language :: Python :: 3",
+    "Topic :: Multimedia :: Sound/Audio :: Speech",
+]
+dependencies = [
+    "whisperx>=3.3.0",
+    "click>=8.0",
+    "rich>=13.0",
+]
+
+[project.optional-dependencies]
+gui = [
+    "nicegui>=2.0",
+    "pywebview>=5.0",
+]
+
+[project.scripts]
+tecjustica-transcribe = "tecjustica_transcribe.cli:main"
+
+[project.gui-scripts]
+tecjustica-gui = "tecjustica_transcribe.gui.app:main"
+
+[tool.hatch.build.targets.sdist]
+exclude = ["*.mp4", "transcricoes/", ".venv/", "dist/", "specs/", ".claude/"]

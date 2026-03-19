@@ -1,0 +1,1 @@
+"""GUI desktop com NiceGUI."""
