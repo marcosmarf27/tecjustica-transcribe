@@ -120,12 +120,7 @@ fi
 # ── Instalar pacotes do sistema ─────────────────────────────────────
 step "Verificando dependências do sistema"
 
-SYSTEM_DEPS=(ffmpeg libgirepository-2.0-dev gcc libcairo2-dev pkg-config python3-dev)
-
-# WebKit só no Linux nativo (não WSL2)
-if [ "$IS_WSL" = false ]; then
-    SYSTEM_DEPS+=(gir1.2-webkit2-4.1)
-fi
+SYSTEM_DEPS=(ffmpeg libgirepository-2.0-dev gcc libcairo2-dev pkg-config python3-dev gir1.2-webkit2-4.1)
 
 MISSING_DEPS=()
 for dep in "${SYSTEM_DEPS[@]}"; do
@@ -168,16 +163,13 @@ else
     success "Pacote instalado"
 fi
 
-# ── PyGObject no venv do uv tool (só Linux nativo) ──────────────────
-if [ "$IS_WSL" = false ]; then
-    step "Instalando PyGObject (interface nativa)"
-    TOOL_VENV="$HOME/.local/share/uv/tools/$PACKAGE"
-    if [ -d "$TOOL_VENV" ]; then
-        uv pip install --python "$TOOL_VENV/bin/python" PyGObject
-        success "PyGObject instalado"
-    else
-        warn "Venv do uv tool não encontrado em $TOOL_VENV — PyGObject não instalado"
-    fi
+step "Instalando PyGObject (interface nativa)"
+TOOL_VENV="$HOME/.local/share/uv/tools/$PACKAGE"
+if [ -d "$TOOL_VENV" ]; then
+    uv pip install --python "$TOOL_VENV/bin/python" PyGObject
+    success "PyGObject instalado"
+else
+    warn "Venv do uv tool não encontrado em $TOOL_VENV — PyGObject não instalado"
 fi
 
 # ── Verificar PATH ──────────────────────────────────────────────────

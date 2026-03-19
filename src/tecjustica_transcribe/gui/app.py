@@ -425,7 +425,7 @@ def main() -> None:
     import platform
 
     native = False
-    if platform.system() == "Linux" and "microsoft" not in platform.release().lower():
+    if platform.system() == "Linux":
         try:
             import webview  # noqa: F401
 
