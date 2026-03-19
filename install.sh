@@ -246,10 +246,16 @@ Categories=AudioVideo;Audio;Office;
 Keywords=transcrição;audiência;whisperx;justiça;
 DESKTOP
 chmod 644 "$DESKTOP_FILE"
+
+# Atualizar banco de dados de atalhos (ajuda WSLg a detectar o .desktop)
+if command -v update-desktop-database &>/dev/null; then
+    update-desktop-database "$DESKTOP_DIR" 2>/dev/null
+fi
+
 success "Atalho criado — procure 'TecJustiça' no menu de aplicativos"
 
 if [ "$IS_WSL" = true ]; then
-    info "No WSL2, o atalho aparece no menu Iniciar do Windows"
+    info "No WSL2, o atalho aparece no menu Iniciar do Windows (requer WSLg)"
 fi
 
 # ── Mensagem final ──────────────────────────────────────────────────

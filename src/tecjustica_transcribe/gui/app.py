@@ -433,10 +433,16 @@ def main() -> None:
         except ImportError:
             pass
 
-    ui.run(
+    run_kwargs = dict(
         title="TecJustiça Transcribe",
-        native=native,
-        window_size=(1050, 750),
         reload=False,
-        show=not native,
     )
+
+    if native:
+        run_kwargs["native"] = True
+        run_kwargs["window_size"] = (1050, 750)
+        run_kwargs["show"] = False
+    else:
+        run_kwargs["show"] = True
+
+    ui.run(**run_kwargs)
