@@ -8,7 +8,7 @@ import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from nicegui import events, ui
+from nicegui import app, events, ui
 
 from tecjustica_transcribe.core.config import obter_token_hf
 from tecjustica_transcribe.core.transcription import (
@@ -47,6 +47,7 @@ class _EstadoTranscricao:
     resultado: TranscriptionResult | None = None
     erro: str | None = None
     arquivo: str = ""
+    media_url: str = ""
     fila: queue.Queue = field(default_factory=queue.Queue)
 
     def resetar(self) -> None:
@@ -64,6 +65,23 @@ class _EstadoTranscricao:
 
 
 _estado = _EstadoTranscricao()
+
+_VIDEO_EXTS = {".mp4", ".mkv", ".avi", ".mov", ".webm"}
+
+
+def _formatar_timestamp(segundos: float) -> str:
+    """Formata segundos como MM:SS ou H:MM:SS."""
+    s = int(segundos)
+    h, s = divmod(s, 3600)
+    m, s = divmod(s, 60)
+    if h:
+        return f"{h}:{m:02d}:{s:02d}"
+    return f"{m:02d}:{s:02d}"
+
+
+def _is_video(path: str) -> bool:
+    """Retorna True se a extensão indica vídeo."""
+    return Path(path).suffix.lower() in _VIDEO_EXTS
 
 
 def conteudo() -> None:
@@ -156,6 +174,8 @@ def conteudo() -> None:
         btn_transcrever.disable()
         progresso_panel.visible = True
         resultado_panel.visible = False
+        player_panel.visible = False
+        transcricao_panel.visible = False
         erro_label.visible = False
         progresso_bar.value = 0
         progresso_label.text = "Iniciando..."
@@ -262,6 +282,116 @@ def conteudo() -> None:
             "color: var(--text); line-height: 1.6"
         )
 
+    # ---- Player ----
+    player_panel = ui.card().classes("vsc-panel w-full q-mt-sm")
+    player_panel.visible = False
+
+    # ---- Transcrição interativa ----
+    transcricao_panel = ui.card().classes("vsc-panel w-full q-mt-sm")
+    transcricao_panel.visible = False
+
+    player_ref: list = [None]
+    segment_rows: list[tuple] = []
+
+    def _popular_midia(result: TranscriptionResult) -> None:
+        """Popula player e transcrição clicável."""
+        arquivo_path = Path(_estado.arquivo)
+        app.add_media_files("/media", str(arquivo_path.parent))
+        _estado.media_url = f"/media/{arquivo_path.name}"
+
+        # Player
+        player_panel.visible = True
+        player_panel.clear()
+        with player_panel:
+            with ui.row().classes("items-center gap-2"):
+                ui.icon("play_circle", size="20px").style(
+                    "color: var(--accent)"
+                )
+                ui.label("REPRODUÇÃO").classes("vsc-section").style(
+                    "margin-bottom: 0 !important"
+                )
+            if _is_video(_estado.arquivo):
+                player = ui.video(_estado.media_url).props(
+                    "controls"
+                ).classes("w-full")
+            else:
+                player = ui.audio(_estado.media_url).props(
+                    "controls"
+                ).classes("w-full")
+        player_ref[0] = player
+
+        # Transcrição
+        transcricao_panel.visible = True
+        transcricao_panel.clear()
+        segment_rows.clear()
+
+        with transcricao_panel:
+            with ui.row().classes("items-center gap-2"):
+                ui.icon("subject", size="20px").style(
+                    "color: var(--accent)"
+                )
+                ui.label("TRANSCRIÇÃO").classes("vsc-section").style(
+                    "margin-bottom: 0 !important"
+                )
+
+            with ui.scroll_area().style("max-height: 400px"):
+                for seg in result.segments:
+                    start = seg.get("start", 0)
+                    end = seg.get("end", 0)
+                    speaker = seg.get("speaker", "")
+                    text = seg.get("text", "").strip()
+
+                    with ui.row().classes(
+                        "segment-row items-center w-full gap-2"
+                    ).style("padding: 6px 8px") as row:
+                        ui.label(
+                            _formatar_timestamp(start)
+                        ).classes("mono").style(
+                            "color: var(--accent); font-size: 12px; "
+                            "min-width: 50px"
+                        )
+                        if speaker:
+                            ui.label(speaker).classes("mono").style(
+                                "font-size: 11px; "
+                                "background: var(--input-bg); "
+                                "padding: 1px 6px; "
+                                "border-radius: 2px; "
+                                "color: var(--text-dim)"
+                            )
+                        ui.label(text).style("font-size: 13px")
+
+                        row.on(
+                            "click",
+                            lambda s=start: (
+                                player_ref[0].seek(s),
+                                player_ref[0].play(),
+                            ),
+                        )
+
+                    segment_rows.append((row, start, end))
+
+        # Highlight do segmento ativo
+        def _on_timeupdate(e) -> None:
+            t = e.args[0] if isinstance(e.args, (list, tuple)) else e.args
+            if not isinstance(t, (int, float)):
+                return
+            for r, s, se in segment_rows:
+                if s <= t < se:
+                    r.classes(add="active")
+                else:
+                    r.classes(remove="active")
+
+        player.on(
+            "timeupdate",
+            _on_timeupdate,
+            ["event.target.currentTime"],
+            throttle=0.5,
+        )
+
+    # Restaurar se já houver resultado (navegação entre páginas)
+    if _estado.resultado is not None and _estado.arquivo:
+        _popular_midia(_estado.resultado)
+
     # ---- Erro ----
     erro_label = ui.label(
         f"Erro: {_estado.erro}" if _estado.erro else ""
@@ -310,6 +440,7 @@ def conteudo() -> None:
                     f"  {result.caminho_json.name}  (dados completos)"
                 )
                 ui.notify("Transcrição concluída!", type="positive")
+                _popular_midia(result)
 
             elif item[0] == "error":
                 error_msg = item[1]

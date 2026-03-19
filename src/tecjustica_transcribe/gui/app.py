@@ -302,6 +302,14 @@ a, .q-btn--flat.text-primary {
     background-color: var(--hover);
 }
 
+/* ---- Segment rows (transcrição interativa) ---- */
+.segment-row { cursor: pointer; transition: background-color 0.15s; }
+.segment-row:hover { background-color: var(--hover) !important; }
+.segment-row.active {
+    background-color: rgba(14, 99, 156, 0.15) !important;
+    border-left: 2px solid var(--accent);
+}
+
 /* ---- Scrollbar ---- */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
