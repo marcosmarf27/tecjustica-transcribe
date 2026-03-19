@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import itertools
+import sys
+import threading
 from typing import Callable
 
 from tecjustica_transcribe import __version__
@@ -259,7 +262,7 @@ body, .q-page, .q-page-container {
     border: 1px dashed var(--border) !important;
     border-radius: 0 !important;
     color: var(--text-dim) !important;
-    max-height: 80px !important;
+    min-height: 60px !important;
 }
 
 .vsc-upload .q-uploader__header {
@@ -335,8 +338,29 @@ _system_info: str | None = None
 def _get_system_info() -> str:
     global _system_info
     if _system_info is None:
-        _system_info = _obter_info_sistema()
+        return "⏳ Detectando GPU..."
     return _system_info
+
+
+def _load_system_info_async() -> None:
+    """Carrega info do sistema em background thread."""
+    global _system_info
+    try:
+        _system_info = _obter_info_sistema()
+    except Exception as exc:
+        _system_info = f"Erro ao detectar GPU: {exc}"
+
+
+def _spinner(msg: str, stop_event: threading.Event) -> None:
+    """Spinner animado no terminal enquanto a GUI carrega."""
+    for c in itertools.cycle(["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]):
+        if stop_event.is_set():
+            break
+        sys.stdout.write(f"\r{c} {msg}")
+        sys.stdout.flush()
+        stop_event.wait(0.1)
+    sys.stdout.write(f"\r✓ {msg}\n")
+    sys.stdout.flush()
 
 
 def _layout(pagina_ativa: str, conteudo_fn: Callable[[], None]) -> None:
@@ -386,16 +410,34 @@ def _layout(pagina_ativa: str, conteudo_fn: Callable[[], None]) -> None:
     with ui.footer().classes("statusbar"):
         with ui.row().classes("w-full items-center justify-between"):
             info = _get_system_info()
-            # Replace placeholder with icon
-            ui.label(info.replace("$(gpu_icon)", "")).style(
+            lbl_info = ui.label(info.replace("$(gpu_icon)", "")).style(
                 "font-size: 12px; font-family: inherit"
             )
             ui.label(f"v{__version__}").style("font-size: 12px; opacity: 0.8")
 
+    # Polling: atualiza status bar quando info do sistema chegar
+    if _system_info is None:
+
+        def _poll_system_info() -> None:
+            if _system_info is not None:
+                lbl_info.text = _system_info.replace("$(gpu_icon)", "")
+                timer.deactivate()
+
+        timer = ui.timer(1.0, _poll_system_info)
+
 
 def main() -> None:
     """Inicia a GUI desktop."""
-    print("⏳ Carregando TecJustiça Transcribe — aguarde...")
+    stop_spinner = threading.Event()
+    threading.Thread(
+        target=_spinner,
+        args=("Carregando TecJustiça Transcribe...", stop_spinner),
+        daemon=True,
+    ).start()
+
+    # Carrega info do sistema (torch/GPU) em background
+    threading.Thread(target=_load_system_info_async, daemon=True).start()
+
     from nicegui import ui
 
     from tecjustica_transcribe.gui.pages import (
@@ -433,6 +475,8 @@ def main() -> None:
             native = True
         except ImportError:
             pass
+
+    stop_spinner.set()
 
     run_kwargs = dict(
         title="TecJustiça Transcribe",
