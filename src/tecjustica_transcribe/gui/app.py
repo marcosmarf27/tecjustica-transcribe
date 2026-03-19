@@ -477,8 +477,7 @@ def main() -> None:
     def page_diagnostico():
         _layout("Sistema", diagnostico.conteudo)
 
-    # WSL2: pywebview falha silenciosamente mesmo com DISPLAY (WSLg).
-    # Usar browser que funciona sempre. Linux nativo → janela desktop.
+    # pywebview nativo (WebKitGTK) — requer GStreamer plugins para vídeo.
     import platform
 
     native = False

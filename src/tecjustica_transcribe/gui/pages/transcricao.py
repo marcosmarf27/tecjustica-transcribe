@@ -47,6 +47,9 @@ class _EstadoTranscricao:
     resultado: TranscriptionResult | None = None
     erro: str | None = None
     arquivo: str = ""
+    modelo: str = "large-v2"
+    output_dir: str = "./transcricoes"
+    diarizacao: bool = True
     fila: queue.Queue = field(default_factory=queue.Queue)
 
     def resetar(self) -> None:
@@ -93,6 +96,7 @@ def conteudo() -> None:
             label="Caminho do arquivo",
             placeholder="/mnt/c/Users/.../audiencia.mp4",
             value=_estado.arquivo,
+            on_change=lambda e: setattr(_estado, "arquivo", e.value),
         ).classes("vsc-input mono w-full")
 
         async def on_upload(e: events.UploadEventArguments) -> None:
@@ -125,18 +129,22 @@ def conteudo() -> None:
         with ui.row().classes("w-full items-end gap-4"):
             output_input = ui.input(
                 label="Pasta de saída",
-                value="./transcricoes",
+                value=_estado.output_dir,
+                on_change=lambda e: setattr(_estado, "output_dir", e.value),
             ).classes("vsc-input mono flex-1")
 
             modelo_select = ui.select(
                 options=["large-v2", "medium", "small", "tiny"],
-                value="large-v2",
+                value=_estado.modelo,
                 label="Modelo",
+                on_change=lambda e: setattr(_estado, "modelo", e.value),
             ).classes("vsc-select").style("min-width: 140px")
 
         with ui.element("div").classes("vsc-switch q-mt-sm"):
             diarizacao_switch = ui.switch(
-                "Identificar falantes (diarização)", value=True
+                "Identificar falantes (diarização)",
+                value=_estado.diarizacao,
+                on_change=lambda e: setattr(_estado, "diarizacao", e.value),
             )
 
     # ---- Botão transcrever ----

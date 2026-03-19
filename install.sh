@@ -120,7 +120,7 @@ fi
 # ── Instalar pacotes do sistema ─────────────────────────────────────
 step "Verificando dependências do sistema"
 
-SYSTEM_DEPS=(ffmpeg libgirepository-2.0-dev gcc libcairo2-dev pkg-config python3-dev gir1.2-webkit2-4.1)
+SYSTEM_DEPS=(ffmpeg libgirepository-2.0-dev gcc libcairo2-dev pkg-config python3-dev gir1.2-webkit2-4.1 gstreamer1.0-plugins-bad gstreamer1.0-libav)
 
 MISSING_DEPS=()
 for dep in "${SYSTEM_DEPS[@]}"; do
