@@ -87,13 +87,17 @@ def conteudo() -> None:
         ).classes("vsc-input mono w-full")
 
         def on_upload(e: events.UploadEventArguments) -> None:
-            temp_dir = Path(tempfile.gettempdir()) / "tecjustica"
-            temp_dir.mkdir(exist_ok=True)
-            dest = temp_dir / e.name
-            dest.write_bytes(e.content.read())
-            caminho_input.value = str(dest)
-            _estado.arquivo = str(dest)
-            ui.notify(f"Arquivo carregado: {e.name}", type="positive")
+            try:
+                temp_dir = Path(tempfile.gettempdir()) / "tecjustica"
+                temp_dir.mkdir(exist_ok=True)
+                dest = temp_dir / e.name
+                dest.write_bytes(e.content.read())
+                path = str(dest)
+                _estado.arquivo = path
+                caminho_input.set_value(path)
+                ui.notify(f"Arquivo carregado: {e.name}", type="positive")
+            except Exception as exc:
+                ui.notify(f"Erro ao salvar arquivo: {exc}", type="negative")
 
         with ui.element("div").classes("vsc-upload w-full q-mt-xs"):
             ui.upload(
@@ -128,7 +132,7 @@ def conteudo() -> None:
 
     # ---- Botão transcrever ----
     def transcrever() -> None:
-        arquivo = caminho_input.value.strip()
+        arquivo = caminho_input.value.strip() or _estado.arquivo
         _estado.arquivo = arquivo
         if not arquivo:
             ui.notify("Selecione um arquivo", type="warning")
