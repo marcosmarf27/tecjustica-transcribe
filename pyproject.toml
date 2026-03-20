@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "tecjustica-transcribe-cli"
-version = "0.1.22"
+version = "0.1.23"
 description = "CLI para transcrição de audiências judiciais com WhisperX e diarização"
 readme = "README.md"
 license = "MIT"
@@ -37,6 +37,9 @@ gui = [
 [project.scripts]
 tecjustica-transcribe = "tecjustica_transcribe.cli:main"
 tecjustica-gui = "tecjustica_transcribe.gui.app:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tecjustica_transcribe"]
 
 [tool.hatch.build.targets.sdist]
 exclude = ["*.mp4", "transcricoes/", ".venv/", "dist/", "specs/", ".claude/"]
