@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "tecjustica-transcribe"
+name = "tecjustica-transcribe-cli"
 version = "0.1.22"
 description = "CLI para transcrição de audiências judiciais com WhisperX e diarização"
 readme = "README.md"
